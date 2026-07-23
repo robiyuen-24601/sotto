@@ -52,3 +52,9 @@ def test_surrounding_quotes_are_peeled():
     raw = "hello there friend of mine"
     cleaned = '"Hello there, friend of mine."'
     assert guard(raw, cleaned) == "Hello there, friend of mine."
+
+
+def test_surrounding_curly_quotes_are_peeled():
+    raw = "hello there friend of mine"
+    cleaned = "“Hello there, friend of mine.”"
+    assert guard(raw, cleaned) == "Hello there, friend of mine."

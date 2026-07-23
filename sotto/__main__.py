@@ -22,7 +22,7 @@ def main() -> None:
         LOG_PATH, maxBytes=1_000_000, backupCount=2
     )
     logging.basicConfig(
-        level=cfg.log_level,
+        level=getattr(logging, str(cfg.log_level).upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(message)s",
         handlers=[handler, logging.StreamHandler()],
     )

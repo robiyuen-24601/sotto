@@ -36,6 +36,7 @@ class SottoApp(rumps.App):
         self.cleaner = None
         self.last_text = ""
         self.paused = False
+        self.load_failed = False
 
         self.item_last = rumps.MenuItem("Last: (none)", callback=self.on_copy_last)
         self.item_cleanup = rumps.MenuItem("Cleanup: on", callback=self.on_toggle_cleanup)
@@ -57,18 +58,27 @@ class SottoApp(rumps.App):
         AppHelper.callAfter(fn, *args)
 
     def _set_title(self, s):
+        if self.load_failed:
+            self.title = "⚠️"
+            return
+        if s == ICON_IDLE and self.paused:
+            s = ICON_PAUSED
         self.title = s
 
     def _set_last(self, text):
         self.item_last.title = f"Last: {text[:48]}"
 
+    def _notify_load_failed(self):
+        try:
+            rumps.notification("sotto", "", "Model load failed; see ~/Library/Logs/sotto.log")
+        except Exception:
+            log.exception("notification failed")
+
     # --- menu callbacks (main thread) ---
 
     def on_copy_last(self, _):
         if self.last_text:
-            from sotto.injector import MacClipboard
-
-            MacClipboard().write(self.last_text)
+            self.injector.clipboard.write(self.last_text)
 
     def on_toggle_cleanup(self, _):
         self.cleanup_enabled = not self.cleanup_enabled
@@ -77,7 +87,7 @@ class SottoApp(rumps.App):
     def on_toggle_pause(self, _):
         self.paused = not self.paused
         self.item_pause.title = "Resume" if self.paused else "Pause"
-        self.title = ICON_PAUSED if self.paused else ICON_IDLE
+        self._set_title(ICON_PAUSED if self.paused else ICON_IDLE)
 
     # --- worker thread ---
 
@@ -93,7 +103,9 @@ class SottoApp(rumps.App):
             self._ui(self._set_title, ICON_IDLE)
         except Exception:
             log.exception("model load failed")
+            self.load_failed = True
             self._ui(self._set_title, "⚠️")
+            self._ui(self._notify_load_failed)
             return
 
         while True:
@@ -102,9 +114,15 @@ class SottoApp(rumps.App):
                 self._handle(action)
             except Exception:
                 log.exception("pipeline error on %s", action)
-                sounds.play(self.cfg.sound_error)
-                self.recorder.stop()  # ensure mic released
+                # Restore state first (mic release, busy flag) so the app is
+                # never left stuck; cosmetic feedback (sound, title) follows
+                # and is guarded so it can't re-raise past state restoration.
+                self.recorder.stop()
                 self.fsm.set_busy(False)
+                try:
+                    self._ui(sounds.play, self.cfg.sound_error)
+                except Exception:
+                    log.exception("error sound failed")
                 self._ui(self._set_title, ICON_IDLE)
 
     def _handle(self, action: Action):
@@ -114,22 +132,23 @@ class SottoApp(rumps.App):
             self._ui(self._set_title, ICON_PAUSED)
             return
         if action is Action.START:
-            sounds.play(self.cfg.sound_start)
+            self._ui(sounds.play, self.cfg.sound_start)
             self._ui(self._set_title, ICON_RECORDING)
             self.recorder.start()
         elif action in (Action.DISCARD, Action.CANCEL):
             self.recorder.stop()
             self._ui(self._set_title, ICON_IDLE)
         elif action is Action.IGNORED_BUSY:
-            sounds.play(self.cfg.sound_error)
+            self._ui(sounds.play, self.cfg.sound_error)
         elif action is Action.STOP:
-            sounds.play(self.cfg.sound_stop)
-            self.fsm.set_busy(True)
+            self._ui(sounds.play, self.cfg.sound_stop)
+            self.fsm.set_busy(True)  # defense-in-depth: tap already set this at dispatch
             self._ui(self._set_title, ICON_PROCESSING)
             try:
                 audio = self.recorder.stop()
                 raw = self.transcriber.transcribe(audio)
-                log.info("raw: %r", raw)
+                log.debug("raw: %r", raw)  # verbatim dictation is sensitive; debug only
+                log.info("dictation: %d chars", len(raw))
                 text = (
                     self.cleaner.clean(raw)
                     if (self.cleanup_enabled and raw)
@@ -138,6 +157,10 @@ class SottoApp(rumps.App):
                 if text:
                     self.last_text = text
                     self._ui(self._set_last, text)
+                    # Deliberately off-main: inject() sleeps (paste
+                    # settle/restore delays) which would block the main run
+                    # loop; the NSPasteboard/CGEvent calls it makes are
+                    # contained by inject()'s own try/finally.
                     self.injector.inject(text)
             finally:
                 self.fsm.set_busy(False)
