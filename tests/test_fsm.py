@@ -63,3 +63,16 @@ def test_second_cycle_after_stop_starts():
     assert fsm.on_hotkey_up(t=11.0) == Action.STOP
     # Second cycle
     assert fsm.on_hotkey_down(t=12.0) == Action.START
+
+
+def test_stop_then_busy_blocks_new_dictation():
+    """Mirrors tap.py's STOP-then-set_busy(True) ordering: once the tap
+    marks the FSM busy after a STOP, a new hotkey down is refused until
+    the worker clears busy when the pipeline finishes."""
+    fsm = make()
+    fsm.on_hotkey_down(t=10.0)
+    assert fsm.on_hotkey_up(t=11.0) == Action.STOP
+    fsm.set_busy(True)
+    assert fsm.on_hotkey_down(t=12.0) == Action.IGNORED_BUSY
+    fsm.set_busy(False)
+    assert fsm.on_hotkey_down(t=13.0) == Action.START
