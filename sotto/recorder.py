@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 
 import numpy as np
 import sounddevice as sd
 
 SAMPLE_RATE = 16000  # matches parakeet's preprocessor_config.sample_rate
+
+log = logging.getLogger("sotto")
 
 
 class Recorder:
@@ -22,6 +25,8 @@ class Recorder:
         self._chunks = []
 
         def callback(indata, frames, time_info, status):
+            if status:
+                log.warning("audio status: %s", status)
             with self._lock:
                 self._chunks.append(indata.copy())
 
@@ -31,15 +36,22 @@ class Recorder:
             dtype="float32",
             callback=callback,
         )
-        self._stream.start()
+        try:
+            self._stream.start()
+        except Exception:
+            self._stream.close()
+            self._stream = None
+            raise
 
     def stop(self) -> np.ndarray:
         """Stop and return the mono float32 waveform (may be empty)."""
         if self._stream is None:
             return np.zeros(0, dtype=np.float32)
-        self._stream.stop()
-        self._stream.close()
-        self._stream = None
+        try:
+            self._stream.stop()
+            self._stream.close()
+        finally:
+            self._stream = None
         with self._lock:
             if not self._chunks:
                 return np.zeros(0, dtype=np.float32)
