@@ -15,7 +15,8 @@ class Transcriber:
         import mlx.core as mx
         from parakeet_mlx.audio import get_logmel
 
-        if audio.size == 0:
+        if audio.size < 400:
+            # one 25ms analysis window at 16kHz; shorter crashes stft padding
             return ""
         mel = get_logmel(mx.array(audio), self.model.preprocessor_config)
         results = self.model.generate(mel)
