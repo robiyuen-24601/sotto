@@ -37,33 +37,53 @@ class HotkeyTap:
         ):
             log.warning("event tap disabled (%s); re-enabling", type_)
             Quartz.CGEventTapEnable(self._tap, True)
-            return event
-
-        keycode = Quartz.CGEventGetIntegerValueField(
-            event, Quartz.kCGKeyboardEventKeycode
-        )
-        if type_ == Quartz.kCGEventFlagsChanged and keycode == self.keycode:
-            flags = Quartz.CGEventGetFlags(event)
-            is_down = bool(flags & Quartz.kCGEventFlagMaskAlternate)
-            action = (
-                self.fsm.on_hotkey_down(time.monotonic())
-                if is_down
-                else self.fsm.on_hotkey_up(time.monotonic())
-            )
-        elif type_ == Quartz.kCGEventKeyDown:
+            # Resynchronize: a hotkey-up could have been dropped while the
+            # tap was disabled, which would otherwise leave the FSM stuck
+            # thinking the mic is still conceptually held. on_other_key()
+            # is a no-op when idle and cancels a stuck RECORDING when not.
             action = self.fsm.on_other_key()
-        else:
+            if action is Action.CANCEL:
+                self.on_action(action)
             return event
 
-        if action is Action.STOP:
-            # close the race window: refuse new dictations before the
-            # worker has even seen this STOP; worker clears busy when done
-            self.fsm.set_busy(True)
-        if action is not Action.NONE:
-            self.on_action(action)
+        try:
+            keycode = Quartz.CGEventGetIntegerValueField(
+                event, Quartz.kCGKeyboardEventKeycode
+            )
+            if type_ == Quartz.kCGEventFlagsChanged and keycode == self.keycode:
+                flags = Quartz.CGEventGetFlags(event)
+                # Known limitation: kCGEventFlagMaskAlternate is the generic
+                # Option-key-down flag, not specific to Right Option. If the
+                # OTHER Option key (Left Option) is also held, the mask stays
+                # set when Right Option is released, so that release is
+                # missed. Rare in practice; flagged for manual QA.
+                is_down = bool(flags & Quartz.kCGEventFlagMaskAlternate)
+                action = (
+                    self.fsm.on_hotkey_down(time.monotonic())
+                    if is_down
+                    else self.fsm.on_hotkey_up(time.monotonic())
+                )
+            elif type_ == Quartz.kCGEventKeyDown:
+                action = self.fsm.on_other_key()
+            else:
+                return event
+
+            if action is Action.STOP:
+                # close the race window: refuse new dictations before the
+                # worker has even seen this STOP; worker clears busy when
+                # done. Invariant: every dispatched STOP must eventually
+                # reach set_busy(False) on ALL worker paths -- including
+                # paused and error paths.
+                self.fsm.set_busy(True)
+            if action is not Action.NONE:
+                self.on_action(action)
+        except Exception:
+            log.exception("tap callback failed")
         return event
 
     def start(self) -> None:
+        if self._tap is not None:
+            return
         mask = Quartz.CGEventMaskBit(
             Quartz.kCGEventFlagsChanged
         ) | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)

@@ -29,9 +29,10 @@ class HotkeyFSM:
     def set_busy(self, busy: bool) -> None:
         """Set pipeline busy state.
 
-        Called from the worker thread. All other methods must be called from the
-        event-tap thread only. Safe because this is a single atomic bool store
-        under the GIL.
+        Called from the worker thread (clear) and the event-tap thread
+        (set-on-STOP). All other methods must be called from the event-tap
+        thread only. Safe because this is a single atomic bool store under
+        the GIL.
         """
         self._busy = busy
 
