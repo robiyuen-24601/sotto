@@ -41,9 +41,12 @@ class HotkeyTap:
             # tap was disabled, which would otherwise leave the FSM stuck
             # thinking the mic is still conceptually held. on_other_key()
             # is a no-op when idle and cancels a stuck RECORDING when not.
-            action = self.fsm.on_other_key()
-            if action is Action.CANCEL:
-                self.on_action(action)
+            try:
+                action = self.fsm.on_other_key()
+                if action is Action.CANCEL:
+                    self.on_action(action)
+            except Exception:
+                log.exception("tap resync failed")
             return event
 
         try:

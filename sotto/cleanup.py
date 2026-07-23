@@ -28,7 +28,7 @@ def guard(raw: str, cleaned: str) -> str:
     # Peel one layer of matched surrounding quotes
     if len(cleaned) > 1:
         if (cleaned[0] == cleaned[-1] and cleaned[0] in ('"', "'")) or (
-            cleaned[0] == '"' and cleaned[-1] == '"'
+            cleaned[0] == "“" and cleaned[-1] == "”"
         ):
             cleaned = cleaned[1:-1]
     if len(raw) >= RATIO_MIN_INPUT_CHARS:
