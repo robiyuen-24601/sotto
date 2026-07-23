@@ -47,3 +47,19 @@ def test_down_while_busy_is_ignored():
 def test_up_without_down_is_ignored():
     fsm = make()
     assert fsm.on_hotkey_up(t=10.0) == Action.NONE
+
+
+def test_exact_boundary_hold_stops():
+    """down at t=10.0, up at t=10.3 with min_hold=0.3 returns STOP (strict <)"""
+    fsm = make(min_hold=0.3)
+    fsm.on_hotkey_down(t=10.0)
+    assert fsm.on_hotkey_up(t=10.3) == Action.STOP
+
+
+def test_second_cycle_after_stop_starts():
+    """After a STOP, FSM returns to IDLE and can start a new recording"""
+    fsm = make()
+    fsm.on_hotkey_down(t=10.0)
+    assert fsm.on_hotkey_up(t=11.0) == Action.STOP
+    # Second cycle
+    assert fsm.on_hotkey_down(t=12.0) == Action.START

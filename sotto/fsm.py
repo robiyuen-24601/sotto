@@ -27,9 +27,20 @@ class HotkeyFSM:
         self._down_at = 0.0
 
     def set_busy(self, busy: bool) -> None:
+        """Set pipeline busy state.
+
+        Called from the worker thread. All other methods must be called from the
+        event-tap thread only. Safe because this is a single atomic bool store
+        under the GIL.
+        """
         self._busy = busy
 
     def on_hotkey_down(self, t: float) -> Action:
+        """Handle hotkey press.
+
+        Args:
+            t: monotonic seconds (time.monotonic()), same clock for down and up.
+        """
         if self._state is not _State.IDLE:
             return Action.NONE
         if self._busy:
@@ -39,6 +50,11 @@ class HotkeyFSM:
         return Action.START
 
     def on_hotkey_up(self, t: float) -> Action:
+        """Handle hotkey release.
+
+        Args:
+            t: monotonic seconds (time.monotonic()), same clock for down and up.
+        """
         if self._state is not _State.RECORDING:
             return Action.NONE
         self._state = _State.IDLE
