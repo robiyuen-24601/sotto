@@ -31,3 +31,24 @@ def test_short_inputs_skip_ratio_check():
 
 def test_output_is_stripped():
     assert guard("hello there", "  Hello there.\n") == "Hello there."
+
+
+def test_ratio_bounds_inclusive():
+    # Exactly 0.5 ratio: 40 chars -> 20 chars
+    raw_40 = "a" * 40
+    assert guard(raw_40, "b" * 20) == "b" * 20
+    # Exactly 2.0 ratio: 40 chars -> 80 chars
+    assert guard(raw_40, "c" * 80) == "c" * 80
+
+
+def test_ratio_min_input_chars_boundary():
+    # 19 chars raw: skips ratio check, even with extreme ratio
+    assert guard("a" * 19, "b" * 100) == "b" * 100
+    # 20 chars raw: applies ratio check, truncated output falls back
+    assert guard("a" * 20, "b" * 5) == "a" * 20
+
+
+def test_surrounding_quotes_are_peeled():
+    raw = "hello there friend of mine"
+    cleaned = '"Hello there, friend of mine."'
+    assert guard(raw, cleaned) == "Hello there, friend of mine."
