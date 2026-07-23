@@ -19,9 +19,9 @@ llm = "b"
 enabled = false
 
 [sounds]
-start = "Pop"
-stop = "Tink"
-error = "Basso"
+start = "Glass"
+stop = "Funk"
+error = "Sosumi"
 
 [log]
 level = "DEBUG"
@@ -33,6 +33,9 @@ level = "DEBUG"
     assert cfg.asr_model == "a"
     assert cfg.llm_model == "b"
     assert cfg.cleanup_enabled is False
+    assert cfg.sound_start == "Glass"
+    assert cfg.sound_stop == "Funk"
+    assert cfg.sound_error == "Sosumi"
     assert cfg.log_level == "DEBUG"
 
 

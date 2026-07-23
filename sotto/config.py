@@ -23,7 +23,7 @@ class SottoConfig:
 def load_config(path: Path) -> SottoConfig:
     if not path.exists():
         return SottoConfig()
-    data = tomllib.loads(path.read_text())
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
     d = SottoConfig()
     hotkey = data.get("hotkey", {})
     models = data.get("models", {})
