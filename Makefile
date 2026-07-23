@@ -1,3 +1,5 @@
+.PHONY: run test install-agent uninstall-agent logs
+
 PY := .venv/bin/python
 
 run:

@@ -1283,7 +1283,7 @@ wheels = [
 [[package]]
 name = "sotto"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "mlx-lm" },
     { name = "numba" },
