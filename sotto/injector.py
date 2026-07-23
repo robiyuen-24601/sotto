@@ -30,11 +30,13 @@ class Injector:
             return
         old = self.clipboard.read()
         self.clipboard.write(text)
-        self.sleep_fn(self.PRE_PASTE_DELAY)
-        self.paste_fn()
-        self.sleep_fn(self.RESTORE_DELAY)
-        if old is not None:
-            self.clipboard.write(old)
+        try:
+            self.sleep_fn(self.PRE_PASTE_DELAY)
+            self.paste_fn()
+            self.sleep_fn(self.RESTORE_DELAY)
+        finally:
+            if old is not None:
+                self.clipboard.write(old)
 
 
 # --- macOS implementations (not unit-tested; exercised in integration) ---
