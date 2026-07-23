@@ -1,0 +1,20 @@
+# sotto configuration
+
+[hotkey]
+keycode = 61          # Right Option
+min_hold_seconds = 0.3
+
+[models]
+asr = "mlx-community/parakeet-tdt-0.6b-v2"
+llm = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
+
+[cleanup]
+enabled = true
+
+[sounds]
+start = "Pop"
+stop = "Tink"
+error = "Basso"
+
+[log]
+level = "INFO"
